@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an idea for Glassforce
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste tokens, org IDs, or customer data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the Salesforce workflow that is slow or painful today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

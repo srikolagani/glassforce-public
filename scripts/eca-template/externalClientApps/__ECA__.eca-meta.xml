@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExternalClientApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <contactEmail>__CONTACT_EMAIL__</contactEmail>
+    <description>Glassforce: macOS command bar for Salesforce. It reads records and updates a field only after you confirm the change. Public PKCE client, no secret. This template is not a published package.</description>
+    <distributionState>Packaged</distributionState>
+    <isProtected>false</isProtected>
+    <label>__LABEL__</label>
+</ExternalClientApplication>

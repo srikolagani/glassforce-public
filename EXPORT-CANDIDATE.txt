@@ -1,0 +1,12 @@
+EXPORT CANDIDATE ONLY. This is not a release and not permission to publish.
+
+Source tip: 1ba70c597abac2edc537f26a40f60645da38ce7c
+Source dirty: false
+Git history was not copied.
+
+This is not a binary release. Existing distribution links in this tree are the
+ones already in the private repository. They are not ready. No release asset
+exists, and no new repository coordinate was added here. Do not deploy, tag,
+or create a tap from this folder. The committed public client id is copied
+unchanged. Git has no Dev Hub retrieve for it, which does not show that the
+value was fabricated.

@@ -1,0 +1,13 @@
+# Glassforce gitleaks config.
+# The packaged External Client App consumer key is a PUBLIC OAuth client id
+# (PKCE; no client secret exists). Allow it so gitleaks doesn't treat it as a leak.
+title = "Glassforce"
+
+[allowlist]
+description = "Public OAuth client id shipped in PackagedApp (PKCE, no secret)"
+paths = [
+  "Sources/GlassforceCore/Auth/PackagedApp.swift",
+]
+regexes = [
+  "3MVG[0-9A-Za-z._]+",
+]

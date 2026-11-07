@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glassforce</title>
+  <meta name="description" content="Glassforce is a native macOS command bar for Salesforce. Press Option-Space, search the org, and open the record.">
+  <meta name="theme-color" content="#e8ebf2">
+  <link rel="icon" href="assets/app-icon-1024.png" type="image/png">
+  <script>
+    (function (doc) {
+      var KEY = "glassforce-theme";
+      var root = doc.documentElement;
+      var stored = null;
+      try {
+        stored = localStorage.getItem(KEY);
+      } catch (err) {
+        stored = null;
+      }
+
+      function resolve(choice) {
+        if (choice === "light" || choice === "dark") return choice;
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+
+      function apply(choice) {
+        var safe = choice === "light" || choice === "dark" ? choice : "unset";
+        var theme = resolve(safe);
+        root.dataset.themeChoice = safe;
+        root.dataset.theme = theme;
+        var meta = doc.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "dark" ? "#101012" : "#e8ebf2");
+      }
+
+      apply(stored === "light" || stored === "dark" ? stored : "unset");
+
+      var preload = doc.createElement("link");
+      preload.rel = "preload";
+      preload.as = "image";
+      preload.href = "assets/mock-search-eae6d2a.png";
+      doc.head.appendChild(preload);
+
+      window.glassforce = { key: KEY, apply: apply, resolve: resolve };
+    })(document);
+  </script>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="nav-wrap">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="./">
+        <img class="mark mark-light" src="assets/wordmark-light.png" alt="Glassforce" width="1600" height="400">
+        <img class="mark mark-dark" src="assets/wordmark-dark.png" alt="Glassforce" width="1600" height="400">
+      </a>
+      <div class="nav-actions">
+        <a class="nav-link" href="https://github.com/srikolagani/glassforce">GitHub</a>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Use dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+            <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15.2 3.6a7.6 7.6 0 1 0 5.4 12.8A6.6 6.6 0 0 1 15.2 3.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="content">
+    <section class="hero">
+      <div class="backdrop" aria-hidden="true"><span></span></div>
+      <div class="wrap hero-copy">
+        <p class="eyebrow">Native macOS app</p>
+        <h1>Spotlight for Salesforce.</h1>
+        <p class="subhead">Your org, one keystroke away.</p>
+        <p class="concrete">Press <kbd>Option-Space</kbd>, search the org, and open the record.</p>
+        <div class="install-card glass">
+          <div class="install-copy">
+            <p class="soon">Coming soon</p>
+            <p class="note">This cask is not available yet.</p>
+            <pre class="command"><code>brew install --cask glassforce</code></pre>
+          </div>
+          <a class="button" href="https://github.com/srikolagani/glassforce#build-from-source">Build from source</a>
+        </div>
+      </div>
+      <figure class="hero-figure wrap">
+        <div class="hero-frame" data-hero data-hero-mode="stills">
+          <img class="still still-light" src="assets/mock-search-eae6d2a.png" alt="Scripted mock demonstration at eae6d2a. Synthetic records. The chip says Sandbox, not Demo. Preview host is 127.0.0.1." width="1440" height="1120">
+          <img class="still still-dark" src="assets/mock-search-eae6d2a.png" alt="Scripted mock demonstration at eae6d2a. Synthetic records. The chip says Sandbox, not Demo. Preview host is 127.0.0.1." width="1440" height="1120">
+        </div>
+      </figure>
+    </section>
+
+    <section class="band wrap" aria-labelledby="features-title">
+      <div class="band-head">
+        <h2 id="features-title">Already in the panel</h2>
+        <p>Five things you can do in the app today.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="glass feature">
+          <h3>Keyboard-first</h3>
+          <p>Type, move with the arrow keys, and press Return. Esc dismisses the panel.</p>
+        </article>
+        <article class="glass feature">
+          <h3>Fuzzy search stays under 50ms</h3>
+          <p>A misspelled name still finds the record.</p>
+        </article>
+        <article class="glass feature">
+          <h3>Open the record in Lightning</h3>
+          <p>The row you pick opens in Lightning, in your browser.</p>
+        </article>
+        <article class="glass feature">
+          <h3>Choose which objects are searchable</h3>
+          <p>The built-in set is Accounts, Contacts, Opportunities, Cases, Reports, and Setup pages. You can add custom objects, and you can turn an object off.</p>
+        </article>
+        <article class="glass feature">
+          <h3>Privacy</h3>
+          <p>You connect with OAuth PKCE. Tokens stay in the Keychain. Glassforce sends no telemetry. Salesforce data stays on the Mac.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="band wrap" aria-labelledby="gallery-title">
+      <div class="band-head">
+        <h2 id="gallery-title">A developer org</h2>
+        <p>Scripted mock demonstration from commit eae6d2a. Synthetic data. The chip in the picture says Sandbox · Acme Corp (UAT), not Demo. The preview host is 127.0.0.1. Not a production org, and not proof of later preview spacing or Demo labeling. Shots that showed a real org are not embedded.</p>
+      </div>
+      <div class="pair">
+        <figure class="shot">
+          <div class="crop crop-acme">
+            <img src="assets/mock-search-eae6d2a.png" alt="Scripted mock demonstration at eae6d2a. Synthetic records. The chip says Sandbox, not Demo." width="1440" height="1120" loading="lazy">
+          </div>
+          <figcaption>Demo synthetic data. Scripted mock at eae6d2a. The chip still says Sandbox, not Demo.</figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="crop crop-reports">
+            <img src="assets/mock-search-eae6d2a.png" alt="Same scripted mock demonstration. Not a report-search proof." width="1440" height="1120" loading="lazy">
+          </div>
+          <figcaption>Same mock capture. Not a separate report-search proof.</figcaption>
+        </figure>
+      </div>
+      <figure class="picker">
+        <figcaption>The Settings picture that named a real org is not embedded. A mock Settings proof is not available yet.</figcaption>
+      </figure>
+    </section>
+
+    <div class="band wrap status">
+      <section class="glass live" aria-labelledby="live-title">
+        <h2 id="live-title">Live today</h2>
+        <p>The hotkey panel, fuzzy search, open record, the object picker, and OAuth connect are in the app today.</p>
+      </section>
+      <section class="later" aria-labelledby="later-title">
+        <h2 id="later-title">Coming later</h2>
+        <p>Cmd-K actions, inline preview, natural-language confirmed writes, a signed DMG, and the Homebrew cask are not in the app yet.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer wrap">
+    <div class="footer-row">
+      <p>Glassforce</p>
+      <p><a href="https://github.com/srikolagani/glassforce/blob/main/LICENSE">MIT License</a></p>
+      <p><a href="https://github.com/srikolagani/glassforce">GitHub</a></p>
+    </div>
+    <p class="legal">Glassforce is not affiliated with Salesforce, Inc. Salesforce is a trademark of Salesforce, Inc.</p>
+  </footer>
+  <script src="site.js"></script>
+</body>
+</html>

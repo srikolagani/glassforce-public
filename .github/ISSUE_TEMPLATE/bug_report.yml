@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in Glassforce is not working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste tokens, org IDs, or customer data. For a security issue, use private vulnerability reporting. See SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Press Option-Space
+        2. Type a query
+        3. Describe the result
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Glassforce version
+      description: No release is tagged yet. Use the commit you ran, or the VERSION file on the app branch.
+      placeholder: commit SHA
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.0"
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or logs
+      description: Redact anything sensitive. Do not paste tokens or org data.

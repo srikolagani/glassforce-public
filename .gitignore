@@ -1,0 +1,35 @@
+# SwiftPM / Xcode build output
+.build/
+build/
+DerivedData/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Packaging
+*.app
+*.dmg
+*.zip
+*.icns.tmp
+
+# Local scratch
+shots/
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Secrets must never be committed (tokens live in the Keychain only)
+.env
+.env.*
+*.p12
+*.mobileprovision
+
+# Packaged-app build config written by scripts/package-eca.sh
+config/*.local.env
