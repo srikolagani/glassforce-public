@@ -60,13 +60,22 @@ final class CommandBarModel {
 
     private var store: RecordStore
     /// How often each record was opened from the panel (record id → count), so frequent picks rank higher.
-    /// Ids only, never record contents. Kept in UserDefaults, capped to the 500 most recent ids.
-    private var opens: [String: Int] = UserDefaults.standard.dictionary(forKey: "recordOpens") as? [String: Int] ?? [:]
+    /// Ids only, never record contents. The store is the process's preference domain.
+    private var opens: [String: Int]
+    private let preferences: PreferenceStore
+    /// Live launches may open any result URL. Mock, fake-data, and panel QA stay on loopback.
+    let egress: EgressPolicy
     /// The panel renders at most this many rows; ranking puts the best ones first.
     static let resultLimit = 80
 
-    init(store: RecordStore = RecordStore()) {
+    init(store: RecordStore = RecordStore(), preferences: PreferenceStore, egress: EgressPolicy = .unrestricted) {
         self.store = store
+        self.preferences = preferences
+        self.egress = egress
+        self.opens = preferences.dictionary(forKey: PreferenceKeys.recordOpens) ?? [:]
+        self.opener = RecordOpener(policy: egress) { url in
+            Task { @MainActor in NSWorkspace.shared.open(url) }
+        }
         refresh()
     }
 
@@ -83,8 +92,8 @@ final class CommandBarModel {
         store.records.first { $0.id == id }
     }
 
-    /// Opens URLs in the default browser; swapped in tests. Click, Return and --open-first all use `open(_:)`.
-    var opener = RecordOpener { url in Task { @MainActor in NSWorkspace.shared.open(url) } }
+    /// Opens URLs in the default browser after `egress` allows them. Click, Return and --open-first all use `open(_:)`.
+    var opener: RecordOpener
     /// Pasteboard write for Cmd-C. The string is the record link only.
     var copyText: (String) -> Void = { text in
         NSPasteboard.general.clearContents()
@@ -116,7 +125,7 @@ final class CommandBarModel {
     func noteOpened(_ record: Record) {
         opens[record.id, default: 0] += 1
         if opens.count > 500, let rarest = opens.min(by: { $0.value < $1.value })?.key { opens[rarest] = nil }
-        UserDefaults.standard.set(opens, forKey: "recordOpens")
+        preferences.set(opens, forKey: PreferenceKeys.recordOpens)
     }
 
     /// Swaps in a new search index (e.g. after an org sync) and re-runs the current query.

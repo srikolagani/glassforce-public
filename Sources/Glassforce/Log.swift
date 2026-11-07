@@ -15,11 +15,19 @@ enum GFLog {
         .app: Logger(subsystem: subsystem, category: "app"),
     ]
     private static let queue = DispatchQueue(label: "glassforce.log")
-    static let fileURL: URL = {
+    private static var overriddenFile: URL?
+    /// Production file. Mock, fake-data, and panel QA call `useDirectory` first so this folder is not created.
+    static var fileURL: URL {
+        if let overriddenFile { return overriddenFile }
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Glassforce")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("glassforce.log")
-    }()
+    }
+
+    static func useDirectory(_ directory: URL) {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        overriddenFile = directory.appendingPathComponent("glassforce.log")
+    }
 
     static func write(_ category: Category, _ message: String) {
         loggers[category]!.notice("\(message, privacy: .public)")

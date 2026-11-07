@@ -33,4 +33,26 @@ struct PackagingTests {
         #expect(!readme.contains("homebrew/cask"))
         #expect(!readme.localizedLowercase.contains("disable gatekeeper"))
     }
+
+    @Test func qaPanelBundleIsSealedAfterThePlistExists() throws {
+        let script = try repoFile("scripts/build-qa-panel.sh")
+        let provenance = script.range(of: "scripts/source-provenance.sh")
+        let plist = script.range(of: "Contents/Info.plist")
+        let remove = script.range(of: "codesign --remove-signature")
+        let seal = script.range(of: "codesign --force --sign - --identifier")
+        let verify = script.range(of: "codesign --verify --strict")
+        #expect(provenance != nil && plist != nil && remove != nil && seal != nil && verify != nil)
+        if let provenance, let plist, let remove, let seal, let verify {
+            #expect(remove.lowerBound < plist.lowerBound)
+            #expect(plist.lowerBound < seal.lowerBound)
+            #expect(seal.lowerBound < verify.lowerBound)
+            #expect(provenance.lowerBound < seal.lowerBound)
+        }
+        #expect(script.contains("GlassforceSourceSHA"))
+        #expect(script.contains("GlassforceSourceDirty"))
+        #expect(script.contains("com.srikolagani.glassforce.qa"))
+        #expect(script.contains("Contents/_CodeSignature/CodeResources") || script.contains("Seal the .app"))
+        #expect(!script.contains("spctl"))
+        #expect(!script.contains("open "))
+    }
 }
