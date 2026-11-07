@@ -1,105 +1,90 @@
 # Glassforce
 
-Spotlight for Salesforce. A native macOS command bar: press **Option-Space**, type a few letters, hit Return, and the record opens in Lightning.
+Your org, one keystroke away.
 
-<img src="docs/images/mock-search-eae6d2a.png" alt="Scripted mock demonstration at commit eae6d2a. Synthetic records. The chip in the picture says Sandbox, not Demo. Preview host is 127.0.0.1." width="720">
+A native macOS command bar for Salesforce. Press **⌥ Space**, type a few letters, and the record opens in Lightning.
 
-Scripted mock demonstration captured at `eae6d2a`. The records are synthetic. The chip in the picture says **Sandbox · Acme Corp (UAT)**, not Demo, and the preview host is `127.0.0.1`. This is not a production org and not proof of later preview spacing or Demo labeling.
+<p align="center">
+  <img src="docs/images/mock-search-eae6d2a.png" width="680" alt="Fixture still of the Glassforce search panel. Synthetic Acme records. The org chip says Sandbox, not Demo. The preview host is 127.0.0.1. Captured from a scripted mock at commit eae6d2a, not a current recording.">
+</p>
 
-## What works today
+<p align="center">
+  <em>Fixture still, holding the place for a current recording. Scripted mock at <code>eae6d2a</code>. Synthetic records. The chip says Sandbox · Acme Corp (UAT), not Demo. Host <code>127.0.0.1</code>.</em>
+</p>
 
-- **Option-Space from any app.** A Liquid Glass panel on the active display. No Dock icon.
-- **Fuzzy search over your org.** Prefix, acronym and typo matching over a local SQLite cache, ranked by title, then subtitle, then object, with a boost for records you open often. Arrow keys move, Return opens, Cmd-C copies the link. `scripts/bench.sh` measures p95 on 10,000 synthetic records (2.5 ms in the latest run, on a release build on an M-series Mac).
-- **Inline preview and Cmd-K.** The selected row shows its type, title, and host. Cmd-K opens Open and Copy Link.
-- **A stage change you confirm.** `move acme deal to closed won` shows the diff. Nothing is written until you click Confirm.
-- **Pick what to search.** The gear at the top right of the search bar, next to the org badge, opens Settings. It lists the objects in your org, custom ones included. An empty object says **0 synced** there, and stays quiet in the search bar.
-- **One-click connect.** An admin installs the Glassforce package once per org, then each user signs in with OAuth (PKCE) and clicks Allow. Tokens stay in the Keychain. No telemetry.
+## Search
 
-The earlier typo-search and Settings pictures showed a real org badge. They are no longer embedded. A matching mock proof is not available yet.
+Fuzzy matching runs on a local cache: prefixes, acronyms, and typos. Results stay grouped by object. Records you open often rank higher.
 
-## Install
+A stage change such as `move acme deal to closed won` shows the before and after. Nothing is written until you click **Confirm**.
 
-Build from source, below. There is no published download and no Homebrew tap yet.
+| Key | Does |
+| --- | --- |
+| ⌥ Space | Open search from any app |
+| ↑ ↓ | Move through results |
+| Return | Open the record in Lightning |
+| Esc | Dismiss the panel |
+| ⌘K | Open, or copy the link |
+| ⌘C | Copy the link when the query has no selection |
+| ⌘, | Choose which objects sync |
 
-A future disk image is ad-hoc signed. Developer ID signing and notarization are optional: set `GLASSFORCE_SIGN_IDENTITY` and `GLASSFORCE_NOTARY_PROFILE` only when those credentials exist. macOS will say an ad-hoc app is from an unidentified developer. The supported approval is **System Settings → Privacy & Security → Open Anyway**. Leave Gatekeeper and quarantine on.
+The selected row shows its type, title, and host. The panel follows the system appearance, uses no Dock icon, and needs no Accessibility permission.
+
+## Your org
+
+An admin installs the package once. Each person signs in with OAuth (PKCE) and confirms the org name, username, and host before anything is saved. Production, Sandbox, and a My Domain are separate choices.
+
+Search covers the objects you leave on. The defaults are Accounts, Contacts, Opportunities, Cases, Leads, Reports, and Setup pages. Custom objects can be added from the gear beside the org chip. An object with nothing synced stays out of the results.
+
+More than one org can be signed in. Search uses the default org.
+
+## Requirements
+
+macOS 26 (Tahoe). Xcode 26, or the Swift 6.2 Command Line Tools. The app’s minimum system version is 26.0.
+
+## Availability
+
+There is no download and no Homebrew tap. Homebrew has not been published or tested. A current build is ad-hoc signed, and Gatekeeper rejects it. Leave Gatekeeper on. For an app you built yourself, the approval path is **System Settings → Privacy & Security → Open Anyway**.
 
 ## Build from source
 
-You need macOS 26 and either Xcode 26 or the Swift 6.2 Command Line Tools (`xcode-select --install`).
-
-**1. Clone**
-
 ```sh
-git clone git@github.com:srikolagani/glassforce.git
-cd glassforce
-```
-
-The packaged External Client App's consumer key is a **public** OAuth client id (PKCE; no client secret). It ships in the source, so a fresh clone needs no env file. Maintainers can still override it with `config/glassforce.local.env` for packaging experiments.
-
-**2. Build, install and launch**
-
-```sh
-scripts/dev-signing.sh   # once: a stable local signing identity, so the Keychain stops re-asking after rebuilds
-scripts/install.sh       # builds a release app, copies it to /Applications and opens it
-```
-
-`dev-signing.sh` prints the identity with `CSSMERR_TP_NOT_TRUSTED`. That's expected for a self-signed local certificate. The first release build takes about 2 minutes.
-
-If SwiftPM fails on `Package.swift` with errors like `reference to member 'v26'` or `undefined symbol Package.__allocating_init`, your Command Line Tools ship stale `*.private.swiftinterface` files. Reinstall the Command Line Tools, or work around it without sudo:
-
-```sh
-PM=~/Library/Caches/glassforce-swiftpm
-mkdir -p "$PM"
-cp -R /Library/Developer/CommandLineTools/usr/lib/swift/pm/ManifestAPI /Library/Developer/CommandLineTools/usr/lib/swift/pm/PluginAPI "$PM"/
-find "$PM" -name '*.private.swiftinterface' -delete
-export SWIFTPM_CUSTOM_LIBS_DIR="$PM"
+git clone https://github.com/srikolagani/glassforce-public.git
+cd glassforce-public
 scripts/install.sh
 ```
 
-The `export` lasts for that terminal only. Set it again before rebuilding in a new one.
+That builds a release app and copies it to `/Applications`. The public OAuth client id is already in the source. Glassforce stays in the menu bar until you choose **Search Salesforce** or press **⌥ Space**.
 
-## Get started
-
-<img src="docs/images/onboarding-install.png" alt="Onboarding step 1: Install Glassforce in your org, with Production, Sandbox and Custom Domain" width="560">
-
-1. Glassforce does not open a window by itself. Click the bolt in the menu bar and choose **Search Salesforce** (or press **Option-Space**). Then **Get Started**, and **Continue** past the Option-Space tip.
-2. **Install Glassforce in your org** (admins, once per org). Pick Production, Sandbox or Custom Domain. For a Developer Edition or any org with a My Domain, pick **Custom Domain** and enter its host, for example `acme-dev-ed.develop.my.salesforce.com`. Click **Install Package**, and finish the install in the browser page that opens. Back in Glassforce, click **Proceed to next step**. Not an admin? Use **Copy install link**. Already installed? **Skip**.
-3. **Connect your org.** Click **Connect**, sign in to Salesforce, click **Allow**. Glassforce always opens an ephemeral sign-in sheet so a leftover browser session cannot silently pick the wrong org.
-4. **Confirm the org.** Glassforce shows the org name, username and instance host. Click **Use this org** to save the sign-in to the Keychain and start syncing, or **Sign in to a different org** to try again. Nothing is saved until you confirm.
-5. Glassforce syncs, then shows **Start Searching**. Press **Option-Space** anywhere, type, and press Return (or click a row) to open the record in Lightning.
-
-Settings (**⌘,** or the gear in the panel) picks which objects are searched:
-
-The Settings picture that named a real org is no longer embedded.
+`scripts/dev-signing.sh` creates a self-signed local identity so the Keychain can keep allowing the app across rebuilds. It is not a Developer ID. If SwiftPM rejects the package manifest, the workaround is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Privacy
 
-- No telemetry, analytics or crash reporting, and no third-party SDKs.
-- Network calls go only to the Salesforce org you signed in to.
-- OAuth tokens live in the macOS Keychain (this device only, not synced to iCloud). Glassforce never sees your password or MFA codes; Salesforce collects them in the system sign-in sheet.
-- Synced record fields are cached as JSON in `~/Library/Application Support/Glassforce` so search doesn't wait on the network. No tokens are stored there.
-- There is no client secret. Glassforce is a public OAuth client protected by PKCE.
+No telemetry, analytics, crash reporting, or third-party SDKs. Traffic goes to the Salesforce org you signed in to. The development mock stays on `127.0.0.1`.
 
-Details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
+Tokens live in the macOS Keychain for this device only. Glassforce does not see your password or MFA codes. The search cache is under `~/Library/Application Support/Glassforce`, and it does not hold tokens. There is no client secret.
 
-## Uninstall
+[SECURITY.md](SECURITY.md)
 
-```sh
-pkill -x Glassforce; rm -rf /Applications/Glassforce.app ~/Applications/Glassforce.app
-rm -rf ~/Library/Application\ Support/Glassforce ~/Library/Logs/Glassforce
-defaults delete com.srikolagani.glassforce 2>/dev/null
-security delete-generic-password -s dev.glassforce.oauth   # repeat until it says the item could not be found
-```
+## Also
 
-In Salesforce, an admin can remove the package under Setup › Installed Packages.
+[Architecture](ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) · [MIT License](LICENSE)
 
-## More
-
-- [ARCHITECTURE.md](ARCHITECTURE.md): how the shell, auth, sync and search fit together
-- [CONTRIBUTING.md](CONTRIBUTING.md): build, test and PR rules
-
-## License
-
-[MIT](LICENSE). Copyright 2026 Sri Kolagani.
+Copyright 2026 Sri Kolagani.
 
 Salesforce is a trademark of Salesforce, Inc. Glassforce is not affiliated with, sponsored by, or endorsed by Salesforce, Inc.
+
+<details>
+<summary>Remove from this Mac</summary>
+
+```sh
+pkill -x Glassforce
+rm -rf /Applications/Glassforce.app ~/Applications/Glassforce.app
+rm -rf ~/Library/Application\ Support/Glassforce ~/Library/Logs/Glassforce
+defaults delete com.srikolagani.glassforce 2>/dev/null
+security delete-generic-password -s dev.glassforce.oauth
+```
+
+Repeat the Keychain command until the item is gone. An admin removes the package in Salesforce under Setup → Installed Packages.
+
+</details>
