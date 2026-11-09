@@ -2,7 +2,7 @@
 
 Glassforce is a native macOS 26 command bar for Salesforce. Press **Option–Space** from any app, search your org, and open a record in Lightning. The panel uses the system Liquid Glass material.
 
-The [Glassforce website](https://glassforce-preview.breezy-otter-7121.chatgpt.site/) shows a capture from the running app with synthetic sample records. The public source snapshot is here; it does not contain a production org or user data.
+The [Glassforce website](https://glassforce-preview.breezy-otter-7121.chatgpt.site/) shows real macOS onboarding captures with fixture org details. The public source snapshot is here; it does not contain a production org or user data.
 
 ## What the app does
 
