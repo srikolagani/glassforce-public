@@ -15,20 +15,38 @@ let systemTargets: [Target] = []
 
 var products: [Product] = [
     .library(name: "GlassforceCore", targets: ["GlassforceCore"]),
+    .executable(name: "GlassforceQA", targets: ["GlassforceQA"]),
 ]
 var targets: [Target] = systemTargets + [
     .target(name: "GlassforceCore", dependencies: coreDependencies),
+    .executableTarget(name: "GlassforceQA", dependencies: ["GlassforceCore"]),
     .testTarget(name: "GlassforceCoreTests", dependencies: ["GlassforceCore"]),
 ]
 #if os(macOS)
-products.append(.executable(name: "Glassforce", targets: ["Glassforce"]))
-targets.append(
+products.append(contentsOf: [
+    .executable(name: "Glassforce", targets: ["Glassforce"]),
+    .executable(name: "GlassforcePanelQA", targets: ["GlassforcePanelQA"]),
+])
+targets.append(contentsOf: [
+    .target(
+        name: "GlassforceKit",
+        dependencies: ["GlassforceCore"],
+        path: "Sources/Glassforce",
+        swiftSettings: [.swiftLanguageMode(.v5)]
+    ),
     .executableTarget(
         name: "Glassforce",
-        dependencies: ["GlassforceCore"],
+        dependencies: ["GlassforceKit"],
+        path: "Sources/GlassforceMain",
         swiftSettings: [.swiftLanguageMode(.v5)]
-    )
-)
+    ),
+    .executableTarget(
+        name: "GlassforcePanelQA",
+        dependencies: ["GlassforceKit"],
+        path: "Sources/GlassforcePanelQA",
+        swiftSettings: [.swiftLanguageMode(.v5)]
+    ),
+])
 #endif
 
 let package = Package(

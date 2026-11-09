@@ -23,7 +23,7 @@ final class AppSession {
         didSet {
             let trimmed = consumerKeyOverride.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed != consumerKeyOverride { consumerKeyOverride = trimmed; return }
-            UserDefaults.standard.set(consumerKeyOverride, forKey: "consumerKeyOverride")
+            preferences.set(consumerKeyOverride, forKey: PreferenceKeys.consumerKeyOverride)
         }
     }
     private(set) var lastConnected: OrgProfile?
@@ -42,10 +42,13 @@ final class AppSession {
     private var resyncQueued: Set<String> = []
     let mock: MockSalesforce?
     let searchModel: CommandBarModel
+    let preferences: PreferenceStore
+    /// Live installs may open Salesforce. Mock and QA may open loopback only.
+    let egress: EgressPolicy
     var presenterFactory: (() -> AuthSessionPresenting)?
     private var signInTask: Task<Void, Never>?
 
-    init(mode: Mode, tokens: TokenManager, local: LocalStore, mock: MockSalesforce?, searchModel: CommandBarModel) {
+    init(mode: Mode, tokens: TokenManager, local: LocalStore, mock: MockSalesforce?, searchModel: CommandBarModel, preferences: PreferenceStore, egress: EgressPolicy) {
         self.mode = mode
         self.tokens = tokens
         self.client = SalesforceClient(tokens: tokens)
@@ -53,8 +56,10 @@ final class AppSession {
         self.selections = ObjectSelectionStore(local: local)
         self.mock = mock
         self.searchModel = searchModel
+        self.preferences = preferences
+        self.egress = egress
         self.directory = local.loadDirectory()
-        self.consumerKeyOverride = UserDefaults.standard.string(forKey: "consumerKeyOverride") ?? ""
+        self.consumerKeyOverride = preferences.string(forKey: PreferenceKeys.consumerKeyOverride) ?? ""
         // Credential check happens in resumeDefaultOrg / needsOnboarding — never assume ready from orgs.json alone.
         searchModel.status = .noOrg
     }
@@ -125,7 +130,7 @@ final class AppSession {
 
     /// Per-object row cap (default 50,000). Override: `defaults write com.srikolagani.glassforce syncObjectCap -int N`.
     var syncCap: Int {
-        let value = UserDefaults.standard.integer(forKey: "syncObjectCap")
+        let value = preferences.integer(forKey: PreferenceKeys.syncObjectCap)
         return value > 0 ? value : SyncPlan.defaultCap
     }
 
@@ -260,6 +265,11 @@ final class AppSession {
         guard gate.canInstall else { installFeedback = WizardGate.noPackageNote; return }
         guard let env = pickedLoginEnvironment() else { return }
         let url = installURL(for: env)
+        guard URLOpenGate.allows(url, policy: egress) else {
+            installFeedback = "That install address is not allowed for this run."
+            gfLog("Glassforce: blocked install URL %@", url.absoluteString)
+            return
+        }
         gfLog("Glassforce: opening install page %@", url.absoluteString)
         installOpened = true
         switch InstallOpen.choose(demoMode: allowsProgrammaticNetworkActions) {
@@ -410,6 +420,7 @@ final class AppSession {
             // Always ephemeral + prompt=login so a stale browser SSO session cannot silently
             // attach a different org than the login host the user picked.
             let request = AuthorizationRequest(loginURL: loginURL, config: config, forceLogin: true)
+            guard URLOpenGate.allows(request.url, policy: egress) else { throw AuthError.server("That sign-in address is not allowed for this run.") }
             guard let presenter = presenterFactory?() else { throw AuthError.interrupted }
             activeAuthPresenter = presenter
             let callback: URL
