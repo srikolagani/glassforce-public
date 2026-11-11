@@ -23,7 +23,7 @@ final class AppSession {
         didSet {
             let trimmed = consumerKeyOverride.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed != consumerKeyOverride { consumerKeyOverride = trimmed; return }
-            UserDefaults.standard.set(consumerKeyOverride, forKey: "consumerKeyOverride")
+            preferences.set(consumerKeyOverride, forKey: PreferenceKeys.consumerKeyOverride)
         }
     }
     private(set) var lastConnected: OrgProfile?
@@ -40,12 +40,17 @@ final class AppSession {
     /// Orgs with a sync running now, and ones that asked for another sync while it ran.
     private(set) var syncingOrgs: Set<String> = []
     private var resyncQueued: Set<String> = []
+    /// Prevent duplicate confirmations while a record update is in flight.
+    private var writesInFlight: Set<String> = []
     let mock: MockSalesforce?
     let searchModel: CommandBarModel
+    let preferences: PreferenceStore
+    /// Live installs may open Salesforce. Mock and QA may open loopback only.
+    let egress: EgressPolicy
     var presenterFactory: (() -> AuthSessionPresenting)?
     private var signInTask: Task<Void, Never>?
 
-    init(mode: Mode, tokens: TokenManager, local: LocalStore, mock: MockSalesforce?, searchModel: CommandBarModel) {
+    init(mode: Mode, tokens: TokenManager, local: LocalStore, mock: MockSalesforce?, searchModel: CommandBarModel, preferences: PreferenceStore, egress: EgressPolicy) {
         self.mode = mode
         self.tokens = tokens
         self.client = SalesforceClient(tokens: tokens)
@@ -53,8 +58,10 @@ final class AppSession {
         self.selections = ObjectSelectionStore(local: local)
         self.mock = mock
         self.searchModel = searchModel
+        self.preferences = preferences
+        self.egress = egress
         self.directory = local.loadDirectory()
-        self.consumerKeyOverride = UserDefaults.standard.string(forKey: "consumerKeyOverride") ?? ""
+        self.consumerKeyOverride = preferences.string(forKey: PreferenceKeys.consumerKeyOverride) ?? ""
         // Credential check happens in resumeDefaultOrg / needsOnboarding — never assume ready from orgs.json alone.
         searchModel.status = .noOrg
     }
@@ -125,7 +132,7 @@ final class AppSession {
 
     /// Per-object row cap (default 50,000). Override: `defaults write com.srikolagani.glassforce syncObjectCap -int N`.
     var syncCap: Int {
-        let value = UserDefaults.standard.integer(forKey: "syncObjectCap")
+        let value = preferences.integer(forKey: PreferenceKeys.syncObjectCap)
         return value > 0 ? value : SyncPlan.defaultCap
     }
 
@@ -174,12 +181,16 @@ final class AppSession {
             directory.setStatus(.needsSignIn, for: id)
             persist()
             gfLog("Glassforce: %@ needs sign-in", org.label)
-            searchModel.status = .failed("\(org.label) needs sign-in. Press Return to reconnect.")
+            if directory.defaultOrg?.id == id {
+                searchModel.status = .failed("\(org.label) needs sign-in. Press Return to reconnect.")
+            }
         } catch {
             gfLog("Glassforce: background sync failed (%@); keeping cached results", "\(error)")
-            searchModel.status = .failed("Couldn't sync \(org.label): \(Self.plainWords(error))")
-            // With cached results on screen the status row is hidden, so say it under the results too.
-            searchModel.notice = "Couldn't sync \(org.label) (\(Self.plainWords(error))). Showing results from the last sync."
+            if directory.defaultOrg?.id == id {
+                searchModel.status = .failed("Couldn't sync \(org.label): \(Self.plainWords(error))")
+                // Do not overwrite a different org's UI after an asynchronous sync.
+                searchModel.notice = "Couldn't sync \(org.label) (\(Self.plainWords(error))). Showing results from the last sync."
+            }
         }
         updateBadge()
     }
@@ -260,6 +271,11 @@ final class AppSession {
         guard gate.canInstall else { installFeedback = WizardGate.noPackageNote; return }
         guard let env = pickedLoginEnvironment() else { return }
         let url = installURL(for: env)
+        guard URLOpenGate.allows(url, policy: egress) else {
+            installFeedback = "That install address is not allowed for this run."
+            gfLog("Glassforce: blocked install URL %@", url.absoluteString)
+            return
+        }
         gfLog("Glassforce: opening install page %@", url.absoluteString)
         installOpened = true
         switch InstallOpen.choose(demoMode: allowsProgrammaticNetworkActions) {
@@ -410,6 +426,7 @@ final class AppSession {
             // Always ephemeral + prompt=login so a stale browser SSO session cannot silently
             // attach a different org than the login host the user picked.
             let request = AuthorizationRequest(loginURL: loginURL, config: config, forceLogin: true)
+            guard URLOpenGate.allows(request.url, policy: egress) else { throw AuthError.server("That sign-in address is not allowed for this run.") }
             guard let presenter = presenterFactory?() else { throw AuthError.interrupted }
             activeAuthPresenter = presenter
             let callback: URL
@@ -498,7 +515,14 @@ final class AppSession {
     /// Requires the pending card's org key to match the in-memory sign-in; otherwise discard and write nothing.
     func confirmPendingOrg(via trigger: NetworkActionTrigger) {
         guard requireUserGesture(trigger, action: "confirmPendingOrg") else { return }
-        guard let signIn = pendingSignIn, let profile = pendingProfile else { return }
+        guard case .confirming(let environment, _) = onboarding.step else { return }
+        gfLog("Glassforce: confirmPendingOrg click received")
+        guard let signIn = pendingSignIn, let profile = pendingProfile else {
+            onboarding.send(.rejectOrg)
+            connectFeedback = "That sign-in is no longer available. Please connect again."
+            gfLog("Glassforce: confirmation missing pending sign-in; returned to Connect")
+            return
+        }
         guard SessionAuthPolicy.pendingMatchesSignIn(pendingOrgKey: profile.id, signInKey: signIn.identity.key) else {
             gfLog("Glassforce: confirm rejected — pending org key does not match sign-in")
             Task { await tokens.discard(signIn) }
@@ -509,7 +533,7 @@ final class AppSession {
             return
         }
         guard onboarding.send(.confirmOrg) else { return }
-        signInTask = Task { await finishConfirmedSignIn(signIn, profile: profile) }
+        signInTask = Task { await finishConfirmedSignIn(signIn, profile: profile, environment: environment) }
     }
 
     /// "Sign in to a different org": drop memory tokens, back to Connect.
@@ -524,7 +548,7 @@ final class AppSession {
         connectFeedback = "Sign in again, and pick the org you meant."
     }
 
-    private func finishConfirmedSignIn(_ signIn: TokenManager.SignIn, profile: OrgProfile) async {
+    private func finishConfirmedSignIn(_ signIn: TokenManager.SignIn, profile: OrgProfile, environment: LoginEnvironment) async {
         let key = signIn.identity.key
         do {
             try await tokens.commit(signIn)
@@ -557,13 +581,14 @@ final class AppSession {
             onboarding.send(.syncFinished)
         } catch let error as AuthError {
             markSyncFailed(error)
-            handleFailure(error)
+            authFlow.cancel()
+            onboarding.send(.syncFailed(environment, error))
         } catch is CancellationError {
-            onboarding.send(.signInFailed(.cancelled))
+            onboarding.send(.syncFailed(environment, .cancelled))
         } catch {
             markSyncFailed(error)
             gfLog("Glassforce: confirm/sync failed: %@", error.localizedDescription)
-            onboarding.send(.signInFailed(.server(error.localizedDescription)))
+            onboarding.send(.syncFailed(environment, .server(error.localizedDescription)))
         }
     }
 
@@ -578,6 +603,9 @@ final class AppSession {
     /// Sends one confirmed field update. Refuses anything that did not come through `ConfirmedWrite`.
     func applyConfirmed(_ write: ConfirmedWrite) async {
         guard let org = directory.defaultOrg else { return }
+        let writeKey = "\(org.id):\(write.recordID)"
+        guard writesInFlight.insert(writeKey).inserted else { return }
+        defer { writesInFlight.remove(writeKey) }
         guard WriteGuard.allowsSend(write, orgID: org.id, record: searchModel.record(id: write.recordID)) else {
             searchModel.pendingWrite.cancel()
             searchModel.notice = "That change is no longer the record you confirmed. Nothing was saved."
@@ -587,6 +615,12 @@ final class AppSession {
             searchModel.notice = "Connect \(org.label) before changing a record."
             return
         }
+        // Credential lookup suspends the main actor. The user may have switched
+        // orgs or a sync may have changed the record while it was suspended.
+        guard directory.defaultOrg?.id == org.id,
+              WriteGuard.allowsSend(write, orgID: org.id, record: searchModel.record(id: write.recordID)) else {
+            return
+        }
         let diff = write.diff
         do {
             try await client.updateField(
@@ -594,10 +628,22 @@ final class AppSession {
                 object: diff.object, id: diff.recordID, field: diff.field, value: diff.after
             )
             gfLog("Glassforce: updated %@ %@ on %@", diff.field, diff.recordID, org.label)
-            searchModel.notice = "Updated \(diff.recordTitle): \(diff.fieldLabel) is now \(diff.after)."
+            // A successful server update must refresh the local search cache;
+            // otherwise a second command still confirms the old stage.
+            await syncSilently(org.id)
+            if directory.defaultOrg?.id == org.id {
+                let success = "Updated \(diff.recordTitle): \(diff.fieldLabel) is now \(diff.after)."
+                if case .failed = searchModel.status {
+                    searchModel.notice = success + " " + (searchModel.notice ?? "The local search cache could not refresh.")
+                } else {
+                    searchModel.notice = success
+                }
+            }
         } catch {
             gfLog("Glassforce: write failed: %@", Self.plainWords(error))
-            searchModel.notice = "Couldn't update \(diff.recordTitle): \(Self.plainWords(error))"
+            if directory.defaultOrg?.id == org.id {
+                searchModel.notice = "Couldn't update \(diff.recordTitle): \(Self.plainWords(error))"
+            }
         }
     }
 

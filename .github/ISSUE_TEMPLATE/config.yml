@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/srikolagani/glassforce/security/advisories/new
+    url: https://github.com/srikolagani/glassforce-public/security
     about: Report security issues in a private advisory, not as a public issue.

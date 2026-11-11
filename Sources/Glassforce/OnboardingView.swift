@@ -38,6 +38,14 @@ struct OnboardingView: View {
             .padding(.top, 12)
             .frame(width: 480, height: 360)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(alignment: .top) {
+                // A dedicated top drag region keeps form fields and action buttons clickable.
+                Color.clear
+                    .frame(height: 22)
+                    .contentShape(Rectangle())
+                    .gesture(WindowDragGesture())
+                    .accessibilityLabel("Move setup window")
+            }
         }
         .frame(width: 560, height: 440)
         .containerBackground(.clear, for: .window)
@@ -224,6 +232,7 @@ private struct ClickOnlyControl: View {
 
     var body: some View {
         label
+            .contentShape(Rectangle())
             // Not a Button and not focusable: Space / Return cannot activate it when the
             // window is key. VoiceOver uses accessibilityAction, which is an allowed trigger.
             .focusable(false)

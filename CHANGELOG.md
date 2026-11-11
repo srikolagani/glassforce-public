@@ -6,6 +6,12 @@ All notable changes to Glassforce are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Search and onboarding windows explicitly activate on user input; dedicated drag handles avoid consuming form clicks.
+- Duplicate confirmations send one update, and a successful write refreshes the cache.
+- Release packaging requires a clean commit and writes generated casks only to build output.
+- HTTP requests refuse automatic redirects.
+
 ### Added
 - Glassforce app icon (glass lightning shard on deep indigo) as an `AppIcon.iconset` and `.icns`, wired into `Glassforce.app`.
 - Wordmark, colour palette, hero art and a brand guide (`docs/brand.md`).
@@ -34,5 +40,5 @@ Milestone 1: the command bar skeleton.
 - swift-testing suites for the record store, search, selection and launch options.
 - CI on GitHub Actions (macOS 26 runner), security policy, contributing guide, issue and PR templates.
 
-[Unreleased]: https://github.com/srikolagani/glassforce/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/srikolagani/glassforce/releases/tag/v0.1.0
+[Unreleased]: https://github.com/srikolagani/glassforce-public/commits/main
+[0.1.0]: #010---2026-11-03

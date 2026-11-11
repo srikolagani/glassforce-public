@@ -5,15 +5,15 @@
 # Developer ID was supplied via GLASSFORCE_SIGN_IDENTITY.
 # Do not install with --no-quarantine. An ad-hoc app is approved by the user
 # in System Settings > Privacy & Security > Open Anyway.
-# Filled by scripts/release.sh. This script does not publish the tap or a release.
+# Template only: not installable. Use build/release/glassforce.rb after packaging.
 cask "glassforce" do
   version "0.1.0"
-  sha256 "5df42cfa748f21887fd5e449270b96e3744f231dd8c66fc8356590c513051cdc"
+  sha256 "GENERATED_BY_SCRIPTS_RELEASE_SH"
 
-  url "https://github.com/srikolagani/glassforce/releases/download/v0.1.0/Glassforce-0.1.0.dmg"
+  url "https://github.com/srikolagani/glassforce-public/releases/download/v0.1.0/Glassforce-0.1.0.dmg"
   name "Glassforce"
   desc "Native macOS command bar for Salesforce"
-  homepage "https://github.com/srikolagani/glassforce"
+  homepage "https://github.com/srikolagani/glassforce-public"
 
   depends_on macos: :tahoe
 

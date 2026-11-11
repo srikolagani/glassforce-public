@@ -2,7 +2,7 @@
 
 Glassforce is a native macOS 26 command bar for Salesforce. Press **Option–Space** from any app, search your org, and open a record in Lightning. The panel uses the system Liquid Glass material.
 
-The [Glassforce website](https://glassforce-preview.breezy-otter-7121.chatgpt.site/) shows real macOS onboarding captures with fixture org details. The public source snapshot is here; it does not contain a production org or user data.
+See the [Glassforce website](https://glassforce-preview.breezy-otter-7121.chatgpt.site/) for an overview. This repository contains the sanitized source snapshot and synthetic fixtures.
 
 ## What the app does
 
@@ -14,18 +14,20 @@ The [Glassforce website](https://glassforce-preview.breezy-otter-7121.chatgpt.si
 
 ## Install status
 
-The public Homebrew release is being prepared. The cask has passed a local Homebrew installation test, but the public tap and download are not live yet. Do not run a tap command until the website shows a verified release.
+There is no published download and no Homebrew tap yet. This source is a release candidate, not a supported binary release. Native tests use mocks and synthetic data; they do not certify package installation or Salesforce writes in your org.
 
 The current source can be built locally on macOS 26 with Xcode 26 or the Swift 6.2 Command Line Tools:
 
 ```sh
 git clone https://github.com/srikolagani/glassforce-public.git
 cd glassforce-public
-scripts/dev-signing.sh
-scripts/install.sh
+GLASSFORCE_SIGN_IDENTITY=- scripts/build-app.sh release
+open build/Glassforce.app
 ```
 
-The first build can take a few minutes. `scripts/dev-signing.sh` creates a stable local identity so Keychain does not ask again after each rebuild. It is self-signed, so macOS may require approval in **System Settings → Privacy & Security → Open Anyway**. Leave Gatekeeper and quarantine enabled.
+The first build can take a few minutes. This command builds an ad-hoc signed app without creating a certificate, changing Keychain settings, or replacing an installed app. macOS may require approval in **System Settings → Privacy & Security → Open Anyway**. Leave Gatekeeper and quarantine enabled.
+
+To move a window, drag the search icon in the command bar or the top edge of the setup card. Text fields and action buttons keep their normal click behavior.
 
 If SwiftPM reports `reference to member 'v26'` or `undefined symbol Package.__allocating_init`, the Command Line Tools may have stale private interface files. Reinstall the tools, or use the documented temporary workaround:
 
@@ -35,7 +37,7 @@ mkdir -p "$PM"
 cp -R /Library/Developer/CommandLineTools/usr/lib/swift/pm/ManifestAPI /Library/Developer/CommandLineTools/usr/lib/swift/pm/PluginAPI "$PM"/
 find "$PM" -name '*.private.swiftinterface' -delete
 export SWIFTPM_CUSTOM_LIBS_DIR="$PM"
-scripts/install.sh
+GLASSFORCE_SIGN_IDENTITY=- scripts/build-app.sh release
 ```
 
 ## Connect your org
@@ -48,12 +50,23 @@ scripts/install.sh
 
 ## Privacy
 
-- OAuth tokens are stored in this device’s macOS Keychain, not in iCloud Keychain.
-- Synced records are cached locally for search. A JSON copy is retained as a fallback; tokens are not stored with records.
-- Network calls go to the Salesforce org you connect. Glassforce does not collect your Salesforce password or MFA codes.
+- Refresh tokens are stored in this device’s macOS Keychain, not in iCloud Keychain. Access tokens stay in memory.
+- Synced record fields are stored locally in SQLite and JSON under `~/Library/Application Support/Glassforce`. This cache is not application-encrypted and may contain sensitive org data. Tokens are not stored with records.
+- Normal sign-in, sync, and update flows use Salesforce endpoints. The app trusts Salesforce token responses for instance and identity URLs; automatic HTTP redirects are refused. Glassforce does not collect your Salesforce password or MFA codes.
 - The app has no telemetry, analytics, crash reporting, or third-party SDKs.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for implementation details and [SECURITY.md](SECURITY.md) for security reporting.
+
+## Verification and packaging
+
+```sh
+scripts/test.sh
+scripts/release.sh
+```
+
+Release packaging requires a clean Git checkout. It produces an ad-hoc signed DMG, checksums, and generated casks in `build/release` without publishing or changing tracked source. The DMG has an Applications shortcut; drag Glassforce into Applications to install. No Developer ID signature or notarization is implied.
+
+Before public distribution, verify the packaged app on a clean Mac and complete an authorized Salesforce sandbox sign-in and sync. A stage update uses the local cached before-value, not server-side optimistic concurrency: another user’s later change can be overwritten. Do not rely on it to detect server conflicts.
 
 ## License
 

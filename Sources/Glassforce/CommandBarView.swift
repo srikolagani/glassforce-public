@@ -59,6 +59,10 @@ struct CommandBarView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(.secondary)
+                .frame(width: 24, height: 40)
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+                .help("Drag to move Glassforce")
 
             TextField("Search Salesforce", text: $model.query)
                 .textFieldStyle(.plain)

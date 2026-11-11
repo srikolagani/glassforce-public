@@ -54,6 +54,7 @@ public enum OnboardingEvent: Equatable, Sendable {
     /// "Sign in to a different org" — discard pending tokens, back to Connect.
     case rejectOrg
     case signInFailed(AuthError)
+    case syncFailed(LoginEnvironment, AuthError)
     case syncProgressed(SyncProgress)
     case syncFinished
     case addAnotherOrg
@@ -91,6 +92,7 @@ public struct Onboarding: Equatable, Sendable {
         case (.failed(let env, _), .connect): return .connecting(env)
         case (.failed(let env, _), .back): return .connect(env)
         case (.failed, .backToInstall): return .install
+        case (.syncing, .syncFailed(let env, let error)): return .failed(env, error)
         case (.syncing(let org, _), .syncProgressed(let progress)): return .syncing(org: org, progress: progress)
         case (.syncing(let org, _), .syncFinished): return .done(org: org)
         case (.done, .addAnotherOrg): return .install

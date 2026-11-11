@@ -1,10 +1,12 @@
+Historical launch draft. Not a current feature or installation statement. Check the root README before reuse.
+
 # Launch drafts
 
 These files are drafts. They are not published. Nobody should post them from this pull request.
 
 Do not send them to Hacker News, X, Reddit, a GitHub discussion, or a pull request comment. Edit them yourself. Post them only after you make the repository public.
 
-This pull request does not change repository visibility. https://github.com/srikolagani/glassforce is private today.
+The separate sanitized public-source repository is https://github.com/srikolagani/glassforce-public. The original repository and its history remain private.
 
 The drafts are `show-hn.md`, `x-thread.md`, `r-salesforce.md`, and `r-macapps.md`. Each file puts a note to you above the post. Paste the post. Leave the note in the file.
 
@@ -21,7 +23,7 @@ Some sentences match across the posts, so the same claim is not worded two ways.
 - Fuzzy search stays under 50 ms.
 - The newest sync code is still on my Mac and is not pushed yet.
 - I have not published a public Salesforce package install link.
-- https://github.com/srikolagani/glassforce
+- https://github.com/srikolagani/glassforce-public
 
 The other paragraphs are written separately. Do not paste one post into two places.
 

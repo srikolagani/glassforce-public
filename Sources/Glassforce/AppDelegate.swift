@@ -18,14 +18,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         options = LaunchOptions(arguments: CommandLine.arguments)
-#if DEBUG
-        // QA: LSUIElement apps never report as frontmost to System Events. This flag makes the
-        // app a regular, activatable app and keys the onboarding window so Return/Space tests work.
-        // Release builds ignore the flag (LaunchForegroundPolicy).
-        if CommandLine.arguments.contains("--qa-foreground") {
+        switch ReleaseBoundary.activation(arguments: CommandLine.arguments, channel: Self.isDebugBuild ? .debug : .release) {
+        case .denied:
+            fputs("Glassforce: QA isolation is a separate program (GlassforceQA). This build will not switch stores.\n", stderr)
+            exit(2)
+        case .presentationOnly:
             options.qaForeground = true
+        case .ignored, .notRequested:
+            options.qaForeground = false
         }
-#endif
         let launchPresentation = LaunchForegroundPolicy.onLaunch(
             qaForeground: options.qaForeground,
             debugBuild: Self.isDebugBuild,
@@ -33,9 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         if launchPresentation == .keyAndActive {
             NSApp.setActivationPolicy(.regular)
-            gfLog("Glassforce: --qa-foreground (DEBUG) — regular activation policy for QA key targeting")
+            gfLog("Glassforce: --qa-foreground (DEBUG) changes window presentation only. Defaults, Keychain, and files stay the installed app's. It is not an isolated QA launch.")
         } else if options.qaForeground {
-            gfLog("Glassforce: --qa-foreground ignored (release, or not a debug build)")
+            gfLog("Glassforce: --qa-foreground ignored. It does not isolate defaults, Keychain, or files.")
         }
         switch options.appearance {
         case .light: NSApp.appearance = NSAppearance(named: .aqua)
@@ -43,7 +44,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case nil: break
         }
 
-        let model = CommandBarModel(store: RecordStore(records: options.fakeData ? FakeData.records : []))
+        let isolatedLaunch = options.mockSalesforce || options.fakeData
+        let preferences: PreferenceStore = isolatedLaunch
+            ? MemoryPreferenceStore(domain: ProcessIdentity.qaDomain)
+            : UserDefaultsPreferenceStore.production()
+        let egress: EgressPolicy = isolatedLaunch ? .loopbackOnly : .unrestricted
+        if options.fakeData {
+            GFLog.useDirectory(FileManager.default.temporaryDirectory.appendingPathComponent("glassforce-fake-data-logs", isDirectory: true))
+        }
+        let model = CommandBarModel(
+            store: RecordStore(records: options.fakeData ? FakeData.records : []),
+            preferences: preferences,
+            egress: egress
+        )
         if options.fakeData {
             // Explicit demo launch only (--fake-data). Never used by a normal install.
             gfLog("Glassforce: DEMO --fake-data: showing fixture records (not a real org)")
@@ -62,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if !options.fakeData {
             GFLog.installCoreSink()
-            let session = makeSession(model: model)
+            let session = makeSession(model: model, preferences: preferences)
             self.session = session
             model.performWrite = { [weak session] write in
                 Task { await session?.applyConfirmed(write) }
@@ -259,39 +272,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.show()
     }
 
-    private func makeSession(model: CommandBarModel) -> AppSession {
+    private func makeSession(model: CommandBarModel, preferences: PreferenceStore) -> AppSession {
         let buildID = Bundle.main.object(forInfoDictionaryKey: "GlassforceBuildID") as? String ?? "dev"
         if options.mockSalesforce {
-            // Mock mode is fully separate from real sign-ins: its own folder and Keychain service,
-            // namespaced per build so ad-hoc rebuilds never trigger Keychain access prompts.
-            let local = LocalStore.applicationSupport(subfolder: "Glassforce-Mock/\(buildID)")
-            let keychain = KeychainSecretStore(service: "dev.glassforce.oauth.mock.\(buildID)")
-            let stateFile = local.directory.appendingPathComponent("mock-salesforce-state.json")
-            if options.resetState {
-                keychain.deleteAll()
-                try? FileManager.default.removeItem(at: local.directory)
-                gfLog("Glassforce: mock state reset")
+            // The mock folder is checked, including symlink parents, before any file or log is created.
+            let productionRoot = LocalStore.applicationSupport().directory
+            let requested = LocalStore.applicationSupport(subfolder: "Glassforce-Mock/\(buildID)").directory
+            let secrets = InMemorySecretStore()
+            let placeholder = RefusalTransport()
+            switch QAIsolation.make(fileRoot: requested, productionRoot: productionRoot, preferences: preferences, secrets: secrets, innerTransport: placeholder) {
+            case .failure(let error):
+                fputs("Glassforce: mock isolation failed (\(error))\n", stderr)
+                exit(2)
+            case .success(let isolation):
+                GFLog.useDirectory(isolation.fileRoot.appendingPathComponent("Logs", isDirectory: true))
+                if options.resetState {
+                    try? FileManager.default.removeItem(at: isolation.fileRoot)
+                    gfLog("Glassforce: mock state reset")
+                }
+                let mock = MockSalesforce(stateFile: isolation.fileRoot.appendingPathComponent("mock-salesforce-state.json"), queryDelay: 0.7)
+                mock.requireInstall = !options.mockPreinstalled
+                mock.installerIsAdmin = !options.mockNonAdmin
+                let host = MockServerHost(mock: mock)
+                do {
+                    let base = try host.start()
+                    gfLog("Glassforce: mock Salesforce listening on %@", base.absoluteString)
+                } catch {
+                    gfLog("Glassforce: mock server failed to start: %@", "\(error)")
+                }
+                mockServer = host
+                let guarded = GuardingTransport(inner: mock, policy: .loopbackOnly)
+                let session = AppSession(
+                    mode: .mock,
+                    tokens: TokenManager(transport: guarded, store: secrets),
+                    local: LocalStore(directory: isolation.fileRoot),
+                    mock: mock,
+                    searchModel: model,
+                    preferences: preferences,
+                    egress: .loopbackOnly
+                )
+                wirePresenter(session)
+                return session
             }
-            let mock = MockSalesforce(stateFile: stateFile, queryDelay: 0.7)
-            mock.requireInstall = !options.mockPreinstalled
-            mock.installerIsAdmin = !options.mockNonAdmin
-            let host = MockServerHost(mock: mock)
-            do {
-                let base = try host.start()
-                gfLog("Glassforce: mock Salesforce listening on %@", base.absoluteString)
-            } catch {
-                gfLog("Glassforce: mock server failed to start: %@", "\(error)")
-            }
-            mockServer = host
-            // Proof / --onboarding-step shots: stay off the Keychain so Allow dialogs never cover the UI.
-            let store: any SecretStore = (options.onboardingStep != nil) ? InMemorySecretStore() : keychain
-            let session = AppSession(mode: .mock, tokens: TokenManager(transport: mock, store: store), local: local, mock: mock, searchModel: model)
-            wirePresenter(session)
-            return session
         }
-        let keychain = KeychainSecretStore(service: "dev.glassforce.oauth")
-        let session = AppSession(mode: .live, tokens: TokenManager(transport: URLSessionTransport(), store: keychain),
-                                 local: .applicationSupport(), mock: nil, searchModel: model)
+        let keychain = KeychainSecretStore(service: ProcessIdentity.productionKeychainService)
+        let session = AppSession(
+            mode: .live,
+            tokens: TokenManager(transport: URLSessionTransport(), store: keychain),
+            local: .applicationSupport(),
+            mock: nil,
+            searchModel: model,
+            preferences: preferences,
+            egress: .unrestricted
+        )
         wirePresenter(session)
         return session
     }

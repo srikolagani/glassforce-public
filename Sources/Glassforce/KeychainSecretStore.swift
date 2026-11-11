@@ -6,6 +6,8 @@ import GlassforceCore
 /// never synced to iCloud.
 struct KeychainSecretStore: SecretStore {
     let service: String
+    let persistsInLoginKeychain = true
+    let folderURL: URL? = nil
 
     private func baseQuery(account: String? = nil) -> [String: Any] {
         var query: [String: Any] = [

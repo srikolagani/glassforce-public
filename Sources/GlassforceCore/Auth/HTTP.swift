@@ -43,6 +43,11 @@ public protocol HTTPTransport: Sendable {
 }
 
 public struct URLSessionTransport: HTTPTransport {
+    // Never let URLSession replay a token form or an authorized API request at
+    // a redirect destination. Callers receive the original 3xx response instead.
+    static let session = URLSession(configuration: .ephemeral,
+                                    delegate: RefuseHTTPRedirects(), delegateQueue: nil)
+
     public init() {}
 
     public func send(_ request: HTTPRequest) async throws -> HTTPResponse {
@@ -51,11 +56,20 @@ public struct URLSessionTransport: HTTPTransport {
         urlRequest.httpBody = request.body
         for (name, value) in request.headers { urlRequest.setValue(value, forHTTPHeaderField: name) }
         urlRequest.timeoutInterval = 30
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        let (data, response) = try await Self.session.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else { throw AuthError.server("Unexpected response") }
         var headers: [String: String] = [:]
         for (key, value) in http.allHeaderFields { headers["\(key)"] = "\(value)" }
         return HTTPResponse(status: http.statusCode, headers: headers, body: data)
+    }
+}
+
+final class RefuseHTTPRedirects: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 }
 

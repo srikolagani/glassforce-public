@@ -2,11 +2,21 @@ import AppKit
 import SwiftUI
 import GlassforceCore
 
-/// Borderless floating panel that can take keyboard focus without activating the app,
-/// the way Spotlight does.
+/// Borderless floating panel with explicit activation for reliable text input.
 final class CommandPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown {
+            NSApp.activate(ignoringOtherApps: true)
+            makeKeyAndOrderFront(nil)
+        }
+        super.sendEvent(event)
+    }
+}
+
+private final class CommandHostingView: NSHostingView<CommandBarView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 @MainActor
@@ -14,7 +24,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     static let panelSize = NSSize(width: 720, height: 560)
 
     private let model: CommandBarModel
-    private let panel: CommandPanel
+    let panel: CommandPanel
     private var keyMonitor: Any?
     private var backdrop: NSWindow?
     var pinned = false
@@ -25,7 +35,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         self.model = model
         panel = CommandPanel(
             contentRect: NSRect(origin: .zero, size: Self.panelSize),
-            styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -47,7 +57,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.isReleasedWhenClosed = false
         panel.delegate = self
 
-        let hosting = NSHostingView(rootView: CommandBarView(model: model))
+        let hosting = CommandHostingView(rootView: CommandBarView(model: model))
         hosting.frame = NSRect(origin: .zero, size: Self.panelSize)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
@@ -63,7 +73,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.orderFrontRegardless()
         // Pinned (screenshot) mode never takes keyboard focus from whatever the user is doing.
         if !pinned {
-            panel.makeKey()
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
             model.requestFocus()
         }
         installKeyMonitor()

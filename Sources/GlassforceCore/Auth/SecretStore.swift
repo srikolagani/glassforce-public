@@ -2,9 +2,18 @@ import Foundation
 
 /// Where refresh tokens live. The app uses the macOS Keychain; tests use `InMemorySecretStore`.
 public protocol SecretStore: Sendable {
+    /// True only for the login Keychain. QA isolation rejects that store.
+    var persistsInLoginKeychain: Bool { get }
+    /// Set when credentials are files under a directory. Nil for memory and Keychain.
+    var folderURL: URL? { get }
     func read(account: String) throws -> Data?
     func write(_ data: Data, account: String) throws
     func delete(account: String) throws
+}
+
+public extension SecretStore {
+    var persistsInLoginKeychain: Bool { false }
+    var folderURL: URL? { nil }
 }
 
 public final class InMemorySecretStore: SecretStore, @unchecked Sendable {

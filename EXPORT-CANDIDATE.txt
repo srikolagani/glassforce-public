@@ -1,12 +1,12 @@
-EXPORT CANDIDATE ONLY. This is not a release and not permission to publish.
+SANITIZED SOURCE CANDIDATE. Not a binary release or permission to publish.
 
-Source tip: 1ba70c597abac2edc537f26a40f60645da38ce7c
+Private source tip: 74f80526d7d84504b93ac682fed8d747e611941d
 Source dirty: false
-Git history was not copied.
+Private Git history was not copied.
 
-This is not a binary release. Existing distribution links in this tree are the
-ones already in the private repository. They are not ready. No release asset
-exists, and no new repository coordinate was added here. Do not deploy, tag,
-or create a tap from this folder. The committed public client id is copied
-unchanged. Git has no Dev Hub retrieve for it, which does not show that the
-value was fabricated.
+This is a source export. Commit the reviewed files in the separate public-source
+repository and build from that clean commit so the installer records its exact
+source version. The public OAuth client id and package id are unchanged. Their
+presence is not proof of live-org acceptance. See README.md and docs/how-to-test.md
+for verification scope and remaining manual acceptance checks. Generated casks
+belong in build/release; the tracked cask is an intentionally unusable template.

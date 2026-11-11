@@ -1,10 +1,12 @@
+Historical launch draft. Not a current feature or installation statement. Check the root README before reuse.
+
 # r/salesforce draft
 
 ## Note before you post
 
 This file is an unpublished draft. Do not post it from this pull request.
 
-https://github.com/srikolagani/glassforce is private today. Make the repository public before you post. Until you do, the link is dead.
+The separate sanitized public-source repository is https://github.com/srikolagani/glassforce-public. Do not make the original private repository or its history public.
 
 Read the r/salesforce sidebar and the self-promotion rules before you post. This note does not quote them, because the rules change.
 
@@ -38,4 +40,4 @@ The license is MIT.
 
 Cmd-K actions, inline preview, natural language writes that you confirm before they run, a signed DMG, and `brew install --cask glassforce` are coming soon.
 
-https://github.com/srikolagani/glassforce
+https://github.com/srikolagani/glassforce-public

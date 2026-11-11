@@ -9,12 +9,26 @@ final class OnboardingWindow: NSWindow {
     override var canBecomeKey: Bool { acceptsKey }
     override var canBecomeMain: Bool { false }
 
+    /// Explicit clicks must activate the accessory app and its borderless window.
+    /// Merely allowing key status does not transfer keyboard focus from the browser.
+    func activateForUserInteraction() {
+        acceptsKey = true
+        NSApp.activate(ignoringOtherApps: true)
+        makeKeyAndOrderFront(nil)
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown || event.type == .rightMouseDown {
-            acceptsKey = true
+            activateForUserInteraction()
         }
         super.sendEvent(event)
     }
+}
+
+/// The auth browser can leave this accessory window inactive. The explicit mouse
+/// click must reach its tap-only controls rather than merely activate the window.
+private final class OnboardingHostingView: NSHostingView<OnboardingView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// Borderless clear host so SwiftUI `.glassEffect` shows the desktop the way the command bar does.
@@ -32,14 +46,15 @@ final class OnboardingWindowController {
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false // glass draws its own depth
-        window.isMovableByWindowBackground = true
+        // Tap-only controls must receive the click, not start a background window drag.
+        window.isMovableByWindowBackground = false
         window.isReleasedWhenClosed = false
         window.title = "Welcome to Glassforce"
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         let root = OnboardingView(session: session, onFinish: onFinish)
-        let host = NSHostingView(rootView: root)
+        let host = OnboardingHostingView(rootView: root)
         host.wantsLayer = true
         host.layer?.backgroundColor = NSColor.clear.cgColor
         window.contentView = host

@@ -1,83 +1,48 @@
-# Glassforce: test it like a brand-new user
+# Test a Glassforce release candidate
 
-Takes about 10 minutes on a Mac. Anything in a code block gets pasted into Terminal.
+## Automated checks
 
-## 1. Remove the package from the demo org (browser, about 30 s)
-
-In the demo org › Setup › **Installed Packages**: **Glassforce** row › **Uninstall** › tick **Yes, I want to uninstall…** › **Uninstall**. Wait for the row to disappear.
-
-## 2. (optional) Record your run, Glassforce windows only
-
-In a second Terminal tab:
+Run on macOS 26 with Swift 6.2 or newer. If the installed Command Line Tools have stale manifest interfaces, use the temporary workaround in the README; do not modify the installed toolchain.
 
 ```sh
-~/gf-launch/record.sh 300
+scripts/test.sh
+scripts/bench.sh
 ```
 
-It captures only Glassforce's own windows, never the browser or your other screens. Ctrl-C stops it early. The video is saved to `~/gf-launch/glassforce-run.mp4`. The first time, macOS may ask to give Terminal screen-recording access.
+The suites use mocks and synthetic records. They cover search, auth state transitions, cancellation, click-only network actions, duplicate write suppression, cache refresh, window focus configuration, repeat presentation, and redirect refusal. They do not prove that a particular Salesforce org accepts the packaged client.
 
-## 3. Get the app from GitHub and install it
+## Isolated panel smoke test
 
 ```sh
-cd /tmp && rm -rf gf-try && git clone git@github.com:srikolagani/glassforce.git gf-try && cd gf-try
-git checkout fix/onboarding-install-step   # or main, once this lands
-export SWIFTPM_CUSTOM_LIBS_DIR=~/Library/Caches/glassforce-swiftpm   # only if your Command Line Tools need the workaround
-scripts/install.sh
+scripts/build-qa-panel.sh
+build/GlassforcePanelQA.app/Contents/MacOS/GlassforcePanelQA --qa-root /tmp/glassforce-panel-review
 ```
 
-No env-file copy step. The packaged public client id ships in source. It takes about 2 minutes. Glassforce stays in the menu bar (the bolt) and does not open a window, a browser, or a sign-in sheet on its own. Click the bolt and choose **Search Salesforce**, or press **⌥ Space**, and the Welcome window opens.
+The QA panel uses memory preferences, memory credentials, a separate file root and no production network. It does not register Option-Space. Verify typing, arrows, Cmd-K, Escape, click-away, and dragging by the search icon. Only use synthetic fixture records in screenshots.
 
-## 4. Install the package (in the app, then the browser)
+## Installer checks
 
-**Get Started** › **Continue** › **Custom Domain** › type your My Domain host › **Install Package**.
-In the browser page that opens: **Install for Admins Only** › **Install** › **Done**.
-Back in Glassforce: **Proceed to next step**.
-
-## 5. Connect and confirm
-
-**Connect** › sign in if asked › **Allow**.
-Glassforce then shows **Is this the right org?** with the org name, username and host.
-Click **Use this org**. (If it's the wrong org, click **Sign in to a different org** and try again.)
-
-## 6. Search
-
-Wait for the sync, then click **Start Searching**. Press **⌥ Space** anywhere, type `acme` (try the typo `acmee` too), and press **Return**. The record should open in Lightning. Clicking a row does the same.
-
-## 7. Pick objects
-
-Press **⌘ ,** (or click the gear in the panel) › Search objects. Turn on an object, for example Lead or a custom one, and it resyncs by itself.
-
-## Start over (wipe the Mac side again)
+From a clean committed checkout:
 
 ```sh
-pkill -x Glassforce; rm -rf /Applications/Glassforce.app ~/Library/Application\ Support/Glassforce ~/Library/Logs/Glassforce
-defaults delete com.srikolagani.glassforce 2>/dev/null
-while security delete-generic-password -s dev.glassforce.oauth >/dev/null 2>&1; do :; done
+scripts/release.sh
+hdiutil verify build/release/Glassforce-0.1.0.dmg
+codesign --verify --strict --verbose=2 build/release/Glassforce.app
 ```
 
-If something breaks, send `~/Library/Logs/Glassforce/glassforce.log`. It never contains tokens.
+Check the DMG contains Glassforce.app and an Applications shortcut. Compare its SHA-256 with build/release/SHA256SUMS. The app's GlassforceSourceSHA and GlassforceSourceDirty fields must match the clean source commit. Copy to a temporary folder for an integrity check; do not replace a user's installed app or delete their data as a test.
 
-## Wipe browser leftovers
+An ad-hoc signature checks integrity only. It is not Developer ID signing, notarization, or Gatekeeper acceptance. Leave quarantine and Gatekeeper enabled.
 
-Clear these too so a fresh connect is not confused by leftover SSO cookies:
+## Manual acceptance before publication
 
-```bash
-rm -rf ~/Library/HTTPStorages/com.srikolagani.glassforce
-rm -rf ~/Library/WebKit/com.srikolagani.glassforce
-rm -rf ~/Library/Cookies/com.srikolagani.glassforce* 2>/dev/null || true
-```
+Use a dedicated test Mac account and an authorized Salesforce sandbox. Do not wipe an existing installation, reset its Keychain, uninstall an org package, or change real records merely to obtain a clean test.
 
-## QA: target the onboarding window with Return / Space
+- Cold launch remains quiet; Option-Space and the menu reveal the expected window.
+- Typing works after switching from another app. Drag the search icon or the setup card's top edge; fields and buttons stay clickable.
+- Repeat show/hide, Escape, click-away, Cmd-K and Settings flows.
+- Setup: custom-domain input, Back, Cancel, retry, rejected org, repeated confirmation, and recovery after failed sync.
+- Install the package only with the org administrator's authorization; confirm OAuth identity and sync read-only first.
+- Any test update needs separate approval for the sandbox record and exact change. Verify both Salesforce and the refreshed cache. The app does not provide server-side optimistic concurrency protection.
 
-Glassforce is an `LSUIElement` (accessory) app, so it never becomes frontmost to System Events.
-For keyboard-injection QA on **Debug** builds only:
-
-```bash
-# Debug build + install, then:
-open -a Glassforce --args --onboarding --qa-foreground
-# Now System Events / osascript can keystroke Return/Space at Glassforce.
-```
-
-`--qa-foreground` sets a regular activation policy, activates the app, and makes the onboarding
-window key. It is compiled out of **release** builds (the flag is ignored there).
-
+Record the commit, build metadata, checks performed, failures and untested cases. Do not describe a mock test as a live acceptance test.
